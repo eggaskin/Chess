@@ -1,5 +1,6 @@
 package chess;
 
+import java.lang.reflect.Array;
 import java.util.Collection;
 import java.util.ArrayList;
 
@@ -198,22 +199,6 @@ public class GameImpl implements ChessGame {
 
         setTeamTurn((teamTurn == TeamColor.WHITE) ? TeamColor.BLACK : TeamColor.WHITE);
     }
-
-//    public class KingPieces<ChessPosition,Collection> {
-//        public final ChessPosition kingPos;
-//        public final Collection moves;
-//
-//        public KingPieces(ChessPosition a, Collection b) {
-//            this.kingPos = a;
-//            this.moves = b;
-//        }
-//    };
-
-//    public Object[] kingPieces(TeamColor teamColor) {
-//
-//        return new Object[]{kingPos, moves};
-//        // return new KingPieces(kingPos, moves);
-//    }
 
     public Collection<ChessMove> allMoves(TeamColor teamColor, boolean valid) {
         Collection<ChessMove> moves = new ArrayList<>();

@@ -1,5 +1,6 @@
 package chess;
 
+import java.util.ArrayList;
 import java.util.Collection;
 
 /**
@@ -9,7 +10,6 @@ import java.util.Collection;
  * methods.
  */
 public interface ChessGame {
-
     /**
      * @return Which team's turn it is
      */
