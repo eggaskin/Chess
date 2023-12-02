@@ -2,8 +2,6 @@ package res;
 
 import models.Game;
 
-import java.util.Objects;
-
 /**
  * A response for a list games request.
  */

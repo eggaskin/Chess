@@ -1,6 +1,5 @@
 package chess;
 
-import java.lang.reflect.Array;
 import java.util.Collection;
 import java.util.ArrayList;
 
@@ -101,7 +100,7 @@ public class GameImpl implements ChessGame {
         }
 
         int direction = (queenside) ? -1 : 1;
-        ChessPosition pos = new PositionImpl(kingPos.getRow(), kingPos.getColumn() + 1*direction);
+        ChessPosition pos = new PositionImpl(kingPos.getRow(), kingPos.getColumn() + direction);
         while (pos.getColumn() != ((queenside) ? kingPos.getColumn()-3 : rookPos.getColumn())) {
             if (board.hasPiece(pos)) {
                 return false;
@@ -193,6 +192,7 @@ public class GameImpl implements ChessGame {
             ((Rook) piece).castle();
         }
         if (piece.getPieceType() == ChessPiece.PieceType.KING) {
+            assert piece instanceof King;
             ((King) piece).castle();
         }
         board.addPiece(end, piece);

@@ -22,6 +22,7 @@ public class JoinGameService {
      */
     public JoinGameResponse joinGame(JoinGameRequest request, String tok) {
         Connection conn = null;
+
         // check fields
         if (request == null || request.getGameID() == 0) {
             return new JoinGameResponse("Error: bad request");
@@ -31,6 +32,7 @@ public class JoinGameService {
             conn = db.getConnection();
             // get user's username
             AuthToken token = (new AuthDAO()).getAuthToken(conn,tok);
+
             if (request.getPlayerColor() != null) {
                 // try to join game
                 (new GameDAO()).claimSpot(conn,request.getGameID(), token.getUsername(), request.getPlayerColor());

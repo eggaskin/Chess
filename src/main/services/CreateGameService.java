@@ -2,12 +2,12 @@ package services;
 
 import dataAccess.DataAccessException;
 import dataAccess.GameDAO;
-import models.AuthToken;
 import models.Game;
 import req.CreateGameRequest;
 import res.CreateGameResponse;
 
 import java.sql.Connection;
+import java.util.UUID;
 
 import static services.Server.db;
 
@@ -35,15 +35,24 @@ public class CreateGameService {
         }
 
         // create game
+        UUID idOne = UUID.randomUUID();
+        String str=""+idOne;
+        int uid=str.hashCode();
+        String filterStr=""+uid;
+        str=filterStr.replaceAll("-", "");
+        nextGameID = Integer.parseInt(str);
+
         Game game = new Game(nextGameID, req.getGameName());
-        nextGameID++;
+
+
+        //nextGameID++;
 
         // try to add game to database
         try {
             conn = Server.db.getConnection();
+            System.out.println(game.getGameID());
             (new GameDAO()).createGame(conn, game);
             return new CreateGameResponse(game.getGameID());
-
         } catch (DataAccessException e) {
             return new CreateGameResponse(e.getMessage());
         } finally {

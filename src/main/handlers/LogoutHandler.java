@@ -1,5 +1,4 @@
 package handlers;
-import dataAccess.AuthDAO;
 import res.MessageResponse;
 import services.LogoutService;
 import spark.*;

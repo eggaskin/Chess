@@ -3,10 +3,12 @@ package services;
 import dataAccess.Database;
 import handlers.*;
 import spark.*;
+import org.eclipse.jetty.websocket.api.annotations.*;
 
 /**
  * The main class to run the Chess server.
  */
+@WebSocket
 public class Server {
 
     /**
@@ -28,6 +30,7 @@ public class Server {
      */
     private void run() {
         Spark.port(8080);
+        Spark.webSocket("/connect", WSHandler.class);
         Spark.externalStaticFileLocation("C:/Users/evely/Desktop/cs240/Chess/web/");
 
         // Setup handlers for endpoints
@@ -39,5 +42,6 @@ public class Server {
         Spark.post("/game", (req,res) -> (new CreateGameHandler()).handle(req,res));
         Spark.put("/game",(req,res) -> (new JoinGameHandler()).handle(req,res));
     }
+
 
 }

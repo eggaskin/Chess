@@ -29,6 +29,7 @@ public class JoinGameHandler extends Handler {
 
         // check if authToken is valid
         var authToken = req.headers("Authorization");
+
         if (!checkAuth(authToken)) {
             res.status(401);
             return new Gson().toJson(new MessageResponse("Error: unauthorized"));

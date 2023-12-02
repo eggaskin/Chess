@@ -1,13 +1,8 @@
 package dataAccess;
 
-import com.google.gson.Gson;
 import models.AuthToken;
-import models.Game;
 
-import java.util.HashMap;
-import java.util.UUID;
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.SQLException;
 /**
  * AuthDAO class.

@@ -3,8 +3,6 @@ package services;
 import dataAccess.AuthDAO;
 import dataAccess.DataAccessException;
 import dataAccess.GameDAO;
-import handlers.ListGamesHandler;
-import models.AuthToken;
 import res.ListGamesResponse;
 import java.sql.Connection;
 import static services.Server.db;

@@ -1,10 +1,7 @@
 package dataAccess;
-import models.AuthToken;
 import models.User;
 
-import java.util.HashMap;
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.SQLException;
 /**
  * The UserDAO class.

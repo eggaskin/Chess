@@ -51,7 +51,6 @@ public class GameDAO {
 
             var json = new Gson().toJson(g.getGame());
             preparedStatement.setString(3, json);
-
             preparedStatement.executeUpdate();
         } catch (SQLException ex) {
             throw new DataAccessException("Create Game: "+ ex.toString());
@@ -208,11 +207,15 @@ public class GameDAO {
                     throw new DataAccessException("Error: already taken");
                 }
                 white = username;
+                System.out.println("set white");
+
             }
             else {
                 if (g.getBlackUsername() != null) {
                     throw new DataAccessException("Error: already taken");
                 }
+                System.out.println("set black");
+
                 black = username;
 
             }
