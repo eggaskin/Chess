@@ -9,34 +9,52 @@ import userCommands.*;
 import javax.websocket.*;
 import java.net.URI;
 
-public class WSClient extends Endpoint implements MessageHandler.Whole<String> {
-    public Session session;
+public class WSClient extends Endpoint {
+    public Session session = null;
     private GameHandler gameHandler;
+    private String loc = "ws://localhost:8080/connect";
 
-    public WSClient() throws Exception {
+    public WSClient(GameHandler handler) throws Exception {
+        this.gameHandler = handler;
+    }
+
+    public void connect() throws Exception {
+        URI uri = new URI(loc);
+        WebSocketContainer container = ContainerProvider.getWebSocketContainer();
+        this.session = container.connectToServer(this, uri);
+        System.out.println("Connected to server");
         this.session.addMessageHandler(new MessageHandler.Whole<String>() {
+            @Override
             public void onMessage(String message) {
-                System.out.println(message);
+                System.out.println("Received message: " + message);
+                // deserialize message to ServerMessage
+                // pass to gameHandler
+                var body = new Gson().fromJson(message, ServerMessage.class);
+                switch (body.getServerMessageType()) {
+                    case LOAD_GAME -> { gameHandler.updateGame(message); }
+                    case ERROR -> { gameHandler.printMessage(new Gson().fromJson(message, ErrorMessage.class).getMessage()); }
+                    case NOTIFICATION -> { gameHandler.printMessage(new Gson().fromJson(message, NotifMessage.class).getMessage()); }
+                }
             }
         });
     }
 
-    private void connect() throws Exception {
-        URI uri = new URI("ws://localhost:8080/connect");
-        WebSocketContainer container = ContainerProvider.getWebSocketContainer();
-        this.session = container.connectToServer(this, uri);
-    }
-
-    private void disconnect() {
+    public void disconnect() {
         try {
             this.session.close();
+            session = null;
+            System.out.println("Disconnected");
+
         } catch (Exception e) {
             System.out.println("Error: " + e.toString());
         }
     }
 
-    public void joinGame(String auth, int gameID, ChessGame.TeamColor color) throws Exception {
-        JoinPlayerCommand command = new JoinPlayerCommand(auth, gameID, color);
+    public void joinGame(String auth, int gameID, String color) throws Exception {
+        System.out.println("Joining game");
+
+        ChessGame.TeamColor teamColor = color.equals("WHITE") ? ChessGame.TeamColor.WHITE : ChessGame.TeamColor.BLACK;
+        JoinPlayerCommand command = new JoinPlayerCommand(auth, gameID, teamColor);
         String message = new Gson().toJson(command);
         this.send(message);
     }
@@ -47,8 +65,8 @@ public class WSClient extends Endpoint implements MessageHandler.Whole<String> {
         this.send(message);
     }
 
-    public void makeMove(String auth, ChessMove move) throws Exception {
-        MoveCommand command = new MoveCommand(auth, move);
+    public void makeMove(String auth, ChessMove move,int id) throws Exception {
+        MoveCommand command = new MoveCommand(auth, move, id);
         String message = new Gson().toJson(command);
         this.send(message);
     }
@@ -66,25 +84,17 @@ public class WSClient extends Endpoint implements MessageHandler.Whole<String> {
     }
 
     public void send(String msg) throws Exception {
-        this.session.getBasicRemote().sendText(msg);
+        System.out.println("Sending message: " + msg);
+        this.session.getAsyncRemote().sendText(msg);
     }
 
-    public void onMessage(String message) {
-        // deserialize message to ServerMessage
-        // pass to gameHandler
-        var body = new Gson().fromJson(message, ServerMessage.class);
-        switch (body.getServerMessageType()) {
-            case LOAD_GAME -> { gameHandler.updateGame(message); }
-            case ERROR -> { gameHandler.printMessage(new Gson().fromJson(message, ErrorMessage.class).getMessage()); }
-            case NOTIFICATION -> { gameHandler.printMessage(new Gson().fromJson(message, NotifMessage.class).getMessage()); }
-        }
-    }
-
-    @OnWebSocketClose
+    @OnOpen
     public void onOpen(Session session, EndpointConfig endpointConfig) {
     }
+    @OnClose
     public void onClose(Session session, CloseReason closeReason) {
     }
+    @OnError
     public void onError(Session session, Throwable throwable) {
     }
 }

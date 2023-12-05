@@ -45,6 +45,8 @@ public class Game {
         this.gameName = gameName;
         this.game = new GameImpl();
         observers = new ArrayList<>();
+        game.getBoard().resetBoard();
+        game.setTeamTurn(ChessGame.TeamColor.WHITE);
 
     }
 
@@ -145,6 +147,10 @@ public class Game {
      */
     public ChessGame getGame() {
         return game;
+    }
+
+    public void setGame(ChessGame game) {
+        this.game = game;
     }
 
 }

@@ -1,5 +1,9 @@
 package comms;
 
+import chess.ChessBoard;
+import chess.ChessMove;
+import chess.ChessPosition;
+import chess.MoveImpl;
 import com.google.gson.Gson;
 import req.CreateGameRequest;
 import req.JoinGameRequest;
@@ -13,9 +17,11 @@ import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.util.HashMap;
+import static comms.Client.wsClient;
+import static comms.Client.loggedIn;
+import static comms.Client.inGame;
 
 public class ServerFacade {
-    private static boolean loggedIn = false;
     private static final String serverUrl = "http://localhost:8080";
 
     private static String currUser = "";
@@ -35,7 +41,7 @@ public class ServerFacade {
         System.out.println("Logged out. Returning to pre-login.");
     }
 
-    public static void register(String serverUrl, String username, String password, String email) throws Exception {
+    public static void register(String username, String password, String email) throws Exception {
         // Specify the desired endpoint
         URI uri = new URI(serverUrl + "/user");
         HttpURLConnection http = (HttpURLConnection) uri.toURL().openConnection();
@@ -55,7 +61,7 @@ public class ServerFacade {
         currUser = username;
     }
 
-    public static void login(String serverUrl, String username, String password) throws Exception {
+    public static void login(String username, String password) throws Exception {
         // Specify the desired endpoint
         URI uri = new URI(serverUrl+"/session");
         HttpURLConnection http = (HttpURLConnection) uri.toURL().openConnection();
@@ -76,7 +82,7 @@ public class ServerFacade {
         currUser = username;
     }
 
-    public static int createGame(String serverUrl, String name) throws Exception {
+    public static int createGame(String name) throws Exception {
         // Specify the desired endpoint
         URI uri = new URI(serverUrl+"/game");
         HttpURLConnection http = (HttpURLConnection) uri.toURL().openConnection();
@@ -98,7 +104,7 @@ public class ServerFacade {
         return id;
     }
 
-    public static void listGames(String serverUrl) throws Exception {
+    public static void listGames() throws Exception {
         // Specify the desired endpoint
         URI uri = new URI(serverUrl+"/game");
         HttpURLConnection http = (HttpURLConnection) uri.toURL().openConnection();
@@ -123,9 +129,7 @@ public class ServerFacade {
         }
     }
 
-    public static void joinGame(String serverUrl,String color, int id) throws Exception {
-        System.out.println("id: " + id);
-        System.out.println("idMap: " + idMap);
+    public static void joinGame(String color, int id) throws Exception {
         id = idMap.get(id);
         // Specify the desired endpoint
         URI uri = new URI(serverUrl+"/game");
@@ -142,10 +146,36 @@ public class ServerFacade {
         http.connect();
         Object responseBody = getResponse(http, JoinGameResponse.class);
 
+        wsClient.connect();
+        if (color == null) {
+            wsClient.joinObserver(authtok, id);
+        } else {
+            wsClient.joinGame(authtok, id, color);
+        }
+        inGame = true;
         // Output the response body
         System.out.println("Joined game!");
     }
 
+    public static void move(ChessPosition pos1, ChessPosition pos2,int gameID) {
+        ChessMove move = new MoveImpl(pos1, pos2,null);
+        try {
+            wsClient.makeMove(authtok, move,gameID);
+        } catch (Exception e) {
+            System.out.println("Error: " + e.toString());
+        }
+    }
+
+    public static void leave(int id) throws Exception {
+        wsClient.leave(authtok, id);
+        wsClient.disconnect();
+        inGame = false;
+    }
+
+    public static void resign(int id) throws Exception {
+        wsClient.resign(authtok, id);
+        //TODO: become an observer
+    }
 
     private static void writeRequestBody(String body, HttpURLConnection http) throws IOException {
         if (!body.isEmpty()) {

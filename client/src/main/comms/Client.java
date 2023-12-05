@@ -1,24 +1,35 @@
+package comms;
+
+import adapter.*;
 import chess.*;
+
+import java.util.Collection;
 import java.util.Scanner;
 import static ui.EscapeSequences.*;
+
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import comms.GameHandler;
 import comms.ServerFacade;
 import comms.WSClient;
+import serverMessages.*;
 
 public class Client {
-    private static boolean loggedIn = false;
-    private static String serverUrl = "http://localhost:8080";
-    private static String labels = "    a  b  c  d  e  f  g  h    ";
-    private static String revlabels = "    h  g  f  e  d  c  b  a    ";
-    private static WSClient wsClient;
+    public static boolean loggedIn = false;
+    public static boolean inGame = false;
+    private static boolean whiteOrient = true;
+    public static GameImpl game;
+    public static int gameID; //TODO: assign
+    public static WSClient wsClient;
 
     public static void main(String[] args) throws Exception {
-
         // print welcome message and help
         System.out.println("Welcome to chess! Send 'help' to see possible commands.");
 
         // start websocket client
         try {
-            wsClient = new WSClient();
+            GameHandler handler = new ActualGameHandler();
+            wsClient = new WSClient(handler);
         } catch (Exception e) {
             System.out.println(e.getMessage());
         }
@@ -31,24 +42,51 @@ public class Client {
             String[] inputArr = line.split(" ");
 
             boolean status = false;
-            if (loggedIn) {
-                status = handleGameReq(inputArr);
-            } else {
-                status = handleReq(inputArr);
+
+            try {
+                if (loggedIn) {
+                    if (inGame) {
+                        status = handleInGame(inputArr);
+                    } else {
+                        status = handleGameReq(inputArr);
+                    }
+                } else {
+                    status = handleReq(inputArr);
+                }
+                if (!status) {
+                    break;
+                }
+            } catch (Exception e) {
+                System.out.println(e.getMessage());
             }
-            if (!status) {
-                break;
-            }
+        }
+    }
+
+    private static class ActualGameHandler implements GameHandler {
+        public void updateGame(String message) {
+            LoadMessage loadMessage = new Gson().fromJson(message, LoadMessage.class);
+            String gamestr = loadMessage.getGame();
+
+            var builder = new GsonBuilder();
+            builder.registerTypeAdapter(ChessBoard.class, new BoardAdapter());
+            builder.registerTypeAdapter(ChessPiece.class, new PieceAdapter());
+
+            game = builder.create().fromJson(gamestr, GameImpl.class);
+            displayBoard(game.getBoard());
+        }
+
+        public void printMessage(String message) {
+            System.out.println(message);
         }
     }
 
     private static boolean handleInGame(String[] inputArr) {
         String ingamehelp = """
-                1. redraw to see game board \n
-                2. move <SQUARE1> <SQUARE2> to move 1 to 2 \n
-                3. highlight to show legal moves \n
-                4. resign to forfeit/end game and not leave \n
-                5. leave to leave game \n
+                1. redraw to see game board 
+                2. move <SQUARE1> <SQUARE2> to move 1 to 2 
+                3. highlight to show legal moves 
+                4. resign to forfeit/end game and not leave 
+                5. leave to leave game 
                 6. help to see possible commands \n""";
 
         // check if user wants help
@@ -58,87 +96,68 @@ public class Client {
 
         if (inputArr[0].equals("redraw")) {
             try {
-                ServerFacade.logout();
-                loggedIn = false;
+                displayBoard(game.getBoard());
             } catch (Exception e) {
                 System.out.println(e.getMessage());
             }
         }
 
-        // check if user wants to create a game
-        if (inputArr[0].equals("create")) {
-            if (inputArr.length != 2) {
-                System.out.println("Invalid number of arguments. Try again.");
-            } else {
-                String name = inputArr[1];
-                try {
-                    ServerFacade.createGame(serverUrl, name);
-                } catch (Exception e) {
-                    System.out.println(e.getMessage());
-                }
-
-            }
-        }
-
-        // check if user wants to list games
-        if (inputArr[0].equals("list")) {
-            try {
-                ServerFacade.listGames(serverUrl);
-            } catch (Exception e) {
-                System.out.println(e.getMessage());
-            }
-        }
-
-        // check if user wants to join a game
-        if (inputArr[0].equals("join")) {
+        if (inputArr[0].equals("move")) {
             if (inputArr.length != 3) {
                 System.out.println("Invalid number of arguments. Try again.");
             } else {
-                String id = inputArr[1];
-                // convert id string to int
-                int idInt = Integer.parseInt(id);
-                String color = inputArr[2];
+                String pos1 = inputArr[1];
+                String pos2 = inputArr[2];
                 try {
-                    ServerFacade.joinGame(serverUrl, color, idInt);
+                    ServerFacade.move(convertPos(pos1),convertPos(pos2),gameID);
                 } catch (Exception e) {
                     System.out.println(e.getMessage());
                 }
-                ChessBoard board = new BoardImpl();
-                board.resetBoard();
-                displayBoard(board);
-                System.out.println();
             }
         }
 
-        // check if user wants to observe a game
-        if (inputArr[0].equals("observe")) {
+        if (inputArr[0].equals("highlight")) {
             if (inputArr.length != 2) {
                 System.out.println("Invalid number of arguments. Try again.");
             } else {
-                String id = inputArr[1];
-                // convert id string to int
-                int idInt = Integer.parseInt(id);
                 try {
-                    ServerFacade.joinGame(serverUrl, null, idInt);
+                    // get legal move
+                    String pos = inputArr[1];
+                    Collection<ChessMove> moves = game.validMoves(convertPos(pos));
+                    highlightBoard(moves);
                 } catch (Exception e) {
-                    System.out.println(e.getMessage()+RESET_BG_COLOR);
+                    System.out.println(e.getMessage());
                 }
-                ChessBoard board = new BoardImpl();
-                board.resetBoard();
-                displayBoard(board);
-                System.out.println();
+            }
+        }
+
+        if (inputArr[0].equals("resign")) {
+            try {
+                ServerFacade.resign(gameID);
+            } catch (Exception e) {
+                System.out.println(e.getMessage());
+            }
+        }
+
+        if (inputArr[0].equals("leave")) {
+            try {
+                ServerFacade.leave(gameID);
+                inGame = false;
+            } catch (Exception e) {
+                System.out.println(e.getMessage());
             }
         }
 
         return true;
     }
+
     private static boolean handleGameReq(String[] inputArr) {
         String postloginhelp = """
-                1. create <NAME> to create a game \n
-                2. list to see all available games \n
-                3. join <ID> <WHITE/BLACK> to join a game \n
-                4. observe <ID> to observe a game \n
-                5. logout to logout and return to prelogin \n
+                1. create <NAME> to create a game 
+                2. list to see all available games 
+                3. join <ID> <WHITE/BLACK> to join a game 
+                4. observe <ID> to observe a game 
+                5. logout to logout and return to prelogin 
                 6. help to see possible commands \n""";
 
         // check if user wants help
@@ -149,7 +168,6 @@ public class Client {
         if (inputArr[0].equals("logout")) {
             try {
                 ServerFacade.logout();
-                loggedIn = false;
             } catch (Exception e) {
                 System.out.println(e.getMessage());
             }
@@ -162,7 +180,7 @@ public class Client {
             } else {
                 String name = inputArr[1];
                 try {
-                    ServerFacade.createGame(serverUrl, name);
+                    ServerFacade.createGame(name);
                 } catch (Exception e) {
                     System.out.println(e.getMessage());
                 }
@@ -173,7 +191,7 @@ public class Client {
         // check if user wants to list games
         if (inputArr[0].equals("list")) {
             try {
-                ServerFacade.listGames(serverUrl);
+                ServerFacade.listGames();
             } catch (Exception e) {
                 System.out.println(e.getMessage());
             }
@@ -189,14 +207,11 @@ public class Client {
                 int idInt = Integer.parseInt(id);
                 String color = inputArr[2];
                 try {
-                    ServerFacade.joinGame(serverUrl, color, idInt);
+                    ServerFacade.joinGame(color, idInt);
+                    whiteOrient = color.equals("WHITE");
                 } catch (Exception e) {
                     System.out.println(e.getMessage());
                 }
-                ChessBoard board = new BoardImpl();
-                board.resetBoard();
-                displayBoard(board);
-                System.out.println();
             }
         }
 
@@ -209,7 +224,7 @@ public class Client {
                 // convert id string to int
                 int idInt = Integer.parseInt(id);
                 try {
-                    ServerFacade.joinGame(serverUrl, null, idInt);
+                    ServerFacade.joinGame(null, idInt);
                 } catch (Exception e) {
                     System.out.println(e.getMessage()+RESET_BG_COLOR);
                 }
@@ -225,9 +240,9 @@ public class Client {
 
     private static boolean handleReq(String[] inputArr) {
         String preloginhelp = """
-        1. register <USERNAME> <PASSWORD> <EMAIL> to make an account \n
-        2. login <USERNAME> <PASSWORD> to login and start playing \n
-        3. help to see possible commands \n
+        1. register <USERNAME> <PASSWORD> <EMAIL> to make an account 
+        2. login <USERNAME> <PASSWORD> to login and start playing 
+        3. help to see possible commands 
         4. quit to exit the program \n""";
 
         // check if user wants to quit
@@ -250,8 +265,7 @@ public class Client {
                 String password = inputArr[2];
                 String email = inputArr[3];
                 try {
-                    ServerFacade.register(serverUrl, username, password, email);
-                    loggedIn = true;
+                    ServerFacade.register(username, password, email);
                 } catch (Exception e) {
                     System.out.println(e.getMessage());
                 }
@@ -266,8 +280,7 @@ public class Client {
                 String username = inputArr[1];
                 String password = inputArr[2];
                 try {
-                    ServerFacade.login(serverUrl, username, password);
-                    loggedIn = true;
+                    ServerFacade.login(username, password);
                 } catch (Exception e) {
                     System.out.println(e.getMessage());
                 }
@@ -279,6 +292,31 @@ public class Client {
         return true;
     }
 
+    private static void highlightBoard(Collection<ChessMove> moves) {
+        // get end positions of all possible moves
+        String[][] boardArr = new String[8][8];
+        ChessBoard board = game.getBoard();
+        for (int i = 1; i<9; i++) {
+            String[] row = new String[8];
+            for (int j = 1; j<9; j++) {
+                ChessPiece piece = board.getPiece(new PositionImpl(i,j));
+                if (piece == null) {
+                    row[j-1] = " ";
+                } else {
+                    row[j-1] = getPieceString(piece.getPieceType(),piece.getTeamColor());
+                }
+            }
+            boardArr[i-1] = row;
+        }
+        for (ChessMove move : moves) {
+            ChessPosition end = move.getEndPosition();
+            int row = end.getRow();
+            int col = end.getColumn();
+            boardArr[row][col] = "X"+boardArr[row][col];
+        }
+        printBoard(boardArr, whiteOrient);
+        System.out.println();
+    }
 
     private static String rowtoString(String[] row, int rownum, boolean blackStart,boolean reverse) {
         String rowString = SET_BG_COLOR_DARK_GREEN + " " + rownum + " " + (blackStart ? SET_BG_COLOR_DARK_GREY : SET_BG_COLOR_LIGHT_GREY);
@@ -286,16 +324,33 @@ public class Client {
         if (reverse) {
             for (int i = 7; i >= 0; i--) {
                 String piece = row[i];
-                rowString += (piece.equals(" ") ? "   " :  piece );
-                rowString += black ? SET_BG_COLOR_DARK_GREY : SET_BG_COLOR_LIGHT_GREY;
-                black = !black;
+                if (piece.startsWith("X")) {
+                    piece = piece.substring(1);
+                    rowString += (piece.equals(" ") ? "   " :  piece );
+                    rowString += black ? SET_BG_COLOR_DARK_GREEN : SET_BG_COLOR_GREEN;
+                    black = !black;
+
+                } else {
+                    rowString += (piece.equals(" ") ? "   " :  piece );
+                    rowString += black ? SET_BG_COLOR_DARK_GREY : SET_BG_COLOR_LIGHT_GREY;
+                    black = !black;
+                }
             }
         } else {
             for (int i = 0; i < 8; i++) {
                 String piece = row[i];
-                rowString += (piece.equals(" ") ? "   " :  piece );
-                rowString += black ? SET_BG_COLOR_DARK_GREY : SET_BG_COLOR_LIGHT_GREY;
-                black = !black;
+                // check if it begins with an X for highlighting, if so take it off
+                if (piece.startsWith("X")) {
+                    piece = piece.substring(1);
+                    rowString += (piece.equals(" ") ? "   " :  piece );
+                    rowString += black ? SET_BG_COLOR_DARK_GREEN : SET_BG_COLOR_GREEN;
+                    black = !black;
+
+                } else {
+                    rowString += (piece.equals(" ") ? "   " :  piece );
+                    rowString += black ? SET_BG_COLOR_DARK_GREY : SET_BG_COLOR_LIGHT_GREY;
+                    black = !black;
+                }
             }
         }
 
@@ -303,6 +358,8 @@ public class Client {
     }
 
     private static void printBoard(String[][] board,boolean reverse) {
+        String labels = "    a  b  c  d  e  f  g  h    ";
+        String revlabels = "    h  g  f  e  d  c  b  a    ";
         if (reverse) {
             System.out.println(SET_BG_COLOR_DARK_GREEN+SET_TEXT_COLOR_WHITE+ revlabels+RESET_BG_COLOR);
             for (int i = 7; i>=0; i--) {
@@ -333,10 +390,16 @@ public class Client {
             }
             boardArr[i-1] = row;
         }
-        printBoard(boardArr, false);
-        System.out.println();
-        printBoard(boardArr, true);
+        printBoard(boardArr, whiteOrient);
+        System.out.println(RESET_BG_COLOR);
         return "";
+    }
+
+    private static ChessPosition convertPos(String pos) {
+        int row = 8 - (pos.charAt(1) - '0');
+        int col = pos.charAt(0) - 'a';
+        return new PositionImpl(row, col);
+        //TODO: test this
     }
 
     private static String getPieceString(ChessPiece.PieceType pieceType, ChessGame.TeamColor teamColor) {

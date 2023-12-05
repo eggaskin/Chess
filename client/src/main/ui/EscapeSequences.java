@@ -1,7 +1,7 @@
 package ui;
 
 /**
- * This class contains constants and functions relating to ANSI Escape Sequences that are useful in the Client display
+ * This class contains constants and functions relating to ANSI Escape Sequences that are useful in the comms.Client display
  */
 public class EscapeSequences {
 

@@ -44,7 +44,6 @@ public class CreateGameService {
 
         Game game = new Game(nextGameID, req.getGameName());
 
-
         //nextGameID++;
 
         // try to add game to database

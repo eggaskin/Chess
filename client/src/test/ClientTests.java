@@ -25,14 +25,14 @@ public class ClientTests {
         //generate a random username
         String newname = "username" + (int)(Math.random() * 1000);
         Assertions.assertDoesNotThrow(() -> {
-            ServerFacade.register(serverUrl,newname,password,email);});
+            ServerFacade.register(newname,password,email);});
     }
 
     @Test
     @Order(3)
     @DisplayName("Logout User")
     public void testLogoutUser() throws Exception {
-        ServerFacade.login(serverUrl,name,password);
+        ServerFacade.login(name,password);
             // just logged in this user in the previous test
         Assertions.assertDoesNotThrow(() -> {
             ServerFacade.logout();
@@ -45,7 +45,7 @@ public class ClientTests {
     public void testInvalidRegisterUser() throws Exception {
         // just registered this user in the previous test
         Assertions.assertThrows(Exception.class, () -> {
-            ServerFacade.register(serverUrl, name, password, email);
+            ServerFacade.register( name, password, email);
         });
         //should throw an error message
     }
@@ -55,7 +55,7 @@ public class ClientTests {
     @Order(5)
     public void testLoginUser() throws Exception {
         Assertions.assertDoesNotThrow(() -> {
-            ServerFacade.login(serverUrl,name,password);
+            ServerFacade.login(name,password);
         });
     }
 
@@ -65,7 +65,7 @@ public class ClientTests {
     public void testInvalidLoginUser() throws Exception {
         ServerFacade.logout();
         Assertions.assertThrows(Exception.class, () -> {
-            ServerFacade.login(serverUrl,name,"wrongPassword");
+            ServerFacade.login(name,"wrongPassword");
         });
     }
 
@@ -73,9 +73,9 @@ public class ClientTests {
     @Order(6)
     @DisplayName("Create Game")
     public void testCreateGame() throws Exception {
-        ServerFacade.login(serverUrl,name,password);
+        ServerFacade.login(name,password);
         Assertions.assertDoesNotThrow(() -> {
-           ServerFacade.createGame(serverUrl, "gameName");
+           ServerFacade.createGame( "gameName");
         });
     }
 
@@ -84,7 +84,7 @@ public class ClientTests {
     @DisplayName("Invalid Create Game - Missing Name")
     public void testInvalidCreateGame() {
         Assertions.assertThrows(Exception.class, () -> {
-            ServerFacade.createGame(serverUrl, null);
+            ServerFacade.createGame( null);
         });
     }
 
@@ -92,11 +92,11 @@ public class ClientTests {
     @Order(8)
     @DisplayName("Join Game")
     public void testJoinGame() throws Exception {
-        ServerFacade.login(serverUrl,name,password);
-        int id = ServerFacade.createGame(serverUrl, "gameName");
-        ServerFacade.listGames(serverUrl);
+        ServerFacade.login(name,password);
+        int id = ServerFacade.createGame( "gameName");
+        ServerFacade.listGames();
         Assertions.assertDoesNotThrow(() -> {
-            ServerFacade.joinGame(serverUrl, "WHITE", 1);
+            ServerFacade.joinGame( "WHITE", 1);
         });
     }
 
@@ -104,9 +104,9 @@ public class ClientTests {
     @Order(9)
     @DisplayName("Invalid Join Game - Game Doesn't Exist")
     public void testInvalidJoinGame() throws Exception {
-        ServerFacade.login(serverUrl,name,password);
+        ServerFacade.login(name,password);
         Assertions.assertThrows(Exception.class, () -> {
-            ServerFacade.joinGame(serverUrl, "WHITE", 0);
+            ServerFacade.joinGame( "WHITE", 0);
         });
     }
 
@@ -114,9 +114,9 @@ public class ClientTests {
     @Order(10)
     @DisplayName("List Games")
     public void testListGames() throws Exception {
-        ServerFacade.login(serverUrl,name,password);
+        ServerFacade.login(name,password);
         Assertions.assertDoesNotThrow(() -> {
-            ServerFacade.listGames(serverUrl);
+            ServerFacade.listGames();
         });
     }
 
@@ -125,7 +125,7 @@ public class ClientTests {
     @DisplayName("Invalid List Games - Not Logged In")
     public void testInvalidListGames() throws Exception {
         Assertions.assertThrows(Exception.class, () -> {
-            ServerFacade.listGames(serverUrl);
+            ServerFacade.listGames();
         });
     }
 }

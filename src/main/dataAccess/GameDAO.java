@@ -10,24 +10,15 @@ import java.util.Objects;
 
 import java.sql.Connection;
 import java.sql.SQLException;
+import adapter.BoardAdapter;
+import adapter.PieceAdapter;
+
 
 /**
  * GameDAO class.
  * Accesses the Game table in the database.
  */
 public class GameDAO {
-
-    class BoardAdapter implements JsonDeserializer<ChessBoard> {
-        public ChessBoard deserialize(JsonElement jsonElement, Type type, JsonDeserializationContext jsonDeserializationContext) throws JsonParseException {
-            return new Gson().fromJson(jsonElement, BoardImpl.class);
-        }
-    }
-
-    class PieceAdapter implements JsonDeserializer<ChessPiece> {
-        public ChessPiece deserialize(JsonElement jsonElement, Type type, JsonDeserializationContext jsonDeserializationContext) throws JsonParseException {
-            return new Gson().fromJson(jsonElement, PieceImpl.class);
-        }
-    }
 
     /**
      * Creates a new GameDAO object.
@@ -83,6 +74,29 @@ public class GameDAO {
                 GameImpl gameobj = builder.create().fromJson(gamestr, GameImpl.class);
 
                 return new Game(gameid, gamename, white, black, gameobj);
+
+            }
+        } catch (SQLException ex) {
+            throw new DataAccessException("Find Game: " +ex.toString());
+        }
+    }
+
+
+    public String findGameStr(Connection conn, int gameID) throws DataAccessException {
+        try (var preparedStatement = conn.prepareStatement("SELECT gameid,gamename,white,black,game FROM games WHERE gameid=?")) {
+            preparedStatement.setInt(1, gameID);
+            try (var rs = preparedStatement.executeQuery()) {
+                if (!rs.next()) {
+                    throw new DataAccessException("Error: game not found");
+                }
+                var gameid = rs.getInt("gameid");
+                var gamename = rs.getString("gamename");
+                var white = rs.getString("white");
+                var black = rs.getString("black");
+
+                var gamestr = rs.getString("game");
+
+                return gamestr;
 
             }
         } catch (SQLException ex) {

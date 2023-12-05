@@ -1,14 +1,14 @@
 package serverMessages;
 
 public class LoadMessage extends ServerMessage {
-    private Object game;
+    private String game;
 
-    public LoadMessage(Object game) {
+    public LoadMessage(String game) {
         super(ServerMessageType.LOAD_GAME);
         this.game = game;
     }
 
-    public Object getGame() {
+    public String getGame() {
         return this.game;
     }
 }
