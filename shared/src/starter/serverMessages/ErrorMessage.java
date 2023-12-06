@@ -1,14 +1,14 @@
 package serverMessages;
 
 public class ErrorMessage extends ServerMessage {
-    private String message;
+    private String errorMessage;
 
     public ErrorMessage(String message) {
         super(ServerMessageType.ERROR);
-        this.message = message;
+        this.errorMessage = message;
     }
 
     public String getMessage() {
-        return this.message;
+        return this.errorMessage;
     }
 }

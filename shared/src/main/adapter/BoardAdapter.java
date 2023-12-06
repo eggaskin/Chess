@@ -3,7 +3,6 @@ package adapter;
 import chess.BoardImpl;
 import chess.ChessBoard;
 import chess.ChessPiece;
-import chess.PieceImpl;
 import com.google.gson.*;
 
 import java.lang.reflect.Type;
