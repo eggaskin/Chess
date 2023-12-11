@@ -177,7 +177,7 @@ public class GameDAO {
         if (!gameExists(conn, gameID)) {
             throw new DataAccessException("Error: game not found");
         }
-        try (var preparedStatement = conn.prepareStatement("UPDATE games SET gamename=? WHERE gameid=?")) {
+        try (var preparedStatement = conn.prepareStatement("UPDATE games SET game=? WHERE gameid=?")) {
             preparedStatement.setString(1, chessGame);
             preparedStatement.setInt(2, gameID);
 
@@ -245,6 +245,40 @@ public class GameDAO {
     }
 
     /**
+     * Removes a spot for a player in a game.
+     * @param gameID the gameID of the game to be updated.
+     * @param playerColor the color of the player to be removed.
+     * @throws DataAccessException
+     */
+    public void removeSpot(Connection conn, int gameID, String playerColor) throws DataAccessException {
+        Game g = findGame(conn, gameID);
+        if (g == null) {
+            throw new DataAccessException("Error: game not found");
+        }
+        String white = g.getWhiteUsername();
+        String black = g.getBlackUsername();
+        // (in case there are already  users in game
+
+        try (var preparedStatement = conn.prepareStatement("UPDATE games SET white=?,black=? WHERE gameid=?")) {
+            if (Objects.equals(playerColor, "WHITE")) {
+                white = null;
+            }
+            else {
+                black = null;
+
+            }
+            preparedStatement.setString(1, white);
+            preparedStatement.setString(2, black);
+
+            preparedStatement.setInt(3, gameID);
+
+            preparedStatement.executeUpdate();
+        } catch (SQLException ex) {
+            throw new DataAccessException(ex.toString());
+        }
+    }
+
+    /**
      * Add a user to the observers of a game.
      * @param gameID the gameID of the game to be observed.
      * @param username the username of the to-be observer.
@@ -260,8 +294,55 @@ public class GameDAO {
             preparedStatement.setInt(2, gameID);
 
             preparedStatement.executeUpdate();
+            System.out.println("added an observer");
+
         } catch (SQLException ex) {
             throw new DataAccessException(ex.toString());
         }
+    }
+
+    /**
+     * Remove a user from the observers of a game.
+     * @param gameID the gameID of the game to be observed.
+     * @param username the username of the to-be observer.
+     * @throws DataAccessException
+     */
+    public void removeObserver(Connection conn, int gameID, String username) throws DataAccessException {
+        if (!gameExists(conn, gameID)) {
+            throw new DataAccessException("Error: game not found");
+        }
+        try (var preparedStatement = conn.prepareStatement("DELETE FROM observers WHERE observer=? AND gameid=?")) {
+            preparedStatement.setString(1, username);
+            preparedStatement.setInt(2, gameID);
+
+            preparedStatement.executeUpdate();
+        } catch (SQLException ex) {
+            throw new DataAccessException(ex.toString());
+        }
+    }
+
+
+    /**
+     * Finds all observers for a game in the database.
+     * @return an array of all observers in that game in the database.
+     * @throws DataAccessException
+     */
+    public LinkedList<String> findObservers(Connection conn, int gameid) throws DataAccessException {
+        LinkedList<String> observers = new LinkedList<>();
+        try (var preparedStatement = conn.prepareStatement("SELECT observer FROM observers WHERE gameid=?")) {
+            preparedStatement.setInt(1, gameid);
+            try (var rs = preparedStatement.executeQuery()) {
+                System.out.println("find observers");
+                while (rs.next()) {
+                    var observer = rs.getString("observer");
+                    System.out.println(observer);
+
+                    observers.add(observer);
+                }
+            }
+        } catch (SQLException ex) {
+            throw new DataAccessException(ex.toString());
+        }
+        return observers;
     }
 }

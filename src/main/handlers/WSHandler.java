@@ -17,6 +17,7 @@ import static services.Server.db;
 import java.sql.Connection;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.Map;
 
 @WebSocket
@@ -67,19 +68,32 @@ public class WSHandler {
         // deserialize message to UserGameCommand
         System.out.printf("Received: %s", message);
         System.out.println();
-
-        var body = new Gson().fromJson(message, UserGameCommand.class);
-        switch (body.getCommandType()) {
-            case JOIN_PLAYER -> { joinPlayer(session,new Gson().fromJson(message, JoinPlayerCommand.class)); }
-            case JOIN_OBSERVER -> { joinObserver(session,new Gson().fromJson(message, IdCommand.class)); }
-            case MAKE_MOVE -> {
-                GsonBuilder gsonBuilder = new GsonBuilder();
-                gsonBuilder.registerTypeAdapter(ChessPosition.class, new PosAdapter());
-                gsonBuilder.registerTypeAdapter(ChessMove.class, new MoveAdapter());
-                Gson gson = gsonBuilder.create();
-                makeMove(session,gson.fromJson(message, MoveCommand.class)); }
-            case LEAVE -> { leave(session,new Gson().fromJson(message, IdCommand.class)); }
-            case RESIGN -> { resign(session,new Gson().fromJson(message, IdCommand.class)); }
+        try {
+            var body = new Gson().fromJson(message, UserGameCommand.class);
+            switch (body.getCommandType()) {
+                case JOIN_PLAYER -> {
+                    joinPlayer(session, new Gson().fromJson(message, JoinPlayerCommand.class));
+                }
+                case JOIN_OBSERVER -> {
+                    joinObserver(session, new Gson().fromJson(message, IdCommand.class));
+                }
+                case MAKE_MOVE -> {
+                    GsonBuilder gsonBuilder = new GsonBuilder();
+                    gsonBuilder.registerTypeAdapter(ChessPosition.class, new PosAdapter());
+                    gsonBuilder.registerTypeAdapter(ChessMove.class, new MoveAdapter());
+                    Gson gson = gsonBuilder.create();
+                    makeMove(session, gson.fromJson(message, MoveCommand.class));
+                }
+                case LEAVE -> {
+                    leave(session, new Gson().fromJson(message, IdCommand.class));
+                }
+                case RESIGN -> {
+                    resign(session, new Gson().fromJson(message, IdCommand.class));
+                }
+            }
+        } catch (Throwable e) {
+            System.out.println("Error: " + e.getMessage());
+            e.printStackTrace();
         }
 
         // check auth token exists
@@ -112,8 +126,6 @@ public class WSHandler {
                 sendSessMessage(session, new Gson().toJson(error));
                 return;
             }
-
-            System.out.println(game.getWhiteUsername() + ", black: " + game.getBlackUsername());
 
             // check if wanted color is full
             if (command.getPlayerColor() == ChessGame.TeamColor.WHITE) {
@@ -189,40 +201,37 @@ public class WSHandler {
     }
 
     private void makeMove(Session session, MoveCommand command) {
-        // check if game exists
-        // check if user is in game
-        // check if move is valid
-        // make move
-        // send message
-        // broadcast message
         Connection conn = null;
         try {
             conn = db.getConnection();
             Game game = (new GameDAO()).findGame(conn, command.getGameID());
             ChessGame gameobj = game.getGame();
-            System.out.println("assuming user is " + getUsernameFromSession(session));
             // check if player's turn
             ChessGame.TeamColor turnColor = gameobj.getTeamTurn();
-            if (turnColor == ChessGame.TeamColor.WHITE && !game.getWhiteUsername().equals(getUsernameFromSession(session))) {
+            String username = getUsernameFromSession(session);
+            System.out.println("username is " + username + " and turn color is " + turnColor.toString());
+
+            if (turnColor == ChessGame.TeamColor.WHITE && !game.getWhiteUsername().equals(username)) {
                 ErrorMessage error = new ErrorMessage("Error: not your turn");
-                sendMessage(command.getGameID(), new Gson().toJson(error), getUsernameFromSession(session));
+                sendMessage(command.getGameID(), new Gson().toJson(error), username);
                 return;
-            } else if (turnColor == ChessGame.TeamColor.BLACK && !game.getBlackUsername().equals(getUsernameFromSession(session))) {
+            } else if (turnColor == ChessGame.TeamColor.BLACK && !game.getBlackUsername().equals(username)) {
                 ErrorMessage error = new ErrorMessage("Error: not your turn");
-                sendMessage(command.getGameID(), new Gson().toJson(error), getUsernameFromSession(session));
+                sendMessage(command.getGameID(), new Gson().toJson(error), username);
+                return;
+            } else if (turnColor == ChessGame.TeamColor.NONE) {
+                ErrorMessage error = new ErrorMessage("Error: game is over");
+                sendMessage(command.getGameID(), new Gson().toJson(error), username);
                 return;
             }
 
-            gameobj.makeMove(command.getMove());
+            gameobj.makeMove(command.getMove()); // this also changes the team turn
 
             // check if in check or checkmate
             if (gameobj.isInCheck(turnColor)) {
                 if (gameobj.isInCheckmate(turnColor)) {
                     NotifMessage notif = new NotifMessage(getUsernameFromSession(session) + " is in checkmate.");
                     broadcastMessage(command.getGameID(), new Gson().toJson(notif), getUsernameFromSession(session));
-                    // resign
-                    //resign(session, new IdCommand(UserGameCommand.CommandType.RESIGN, command.getAuthString(), command.getGameID()));
-                    //return;
                 } else {
                     // check
                     NotifMessage notif = new NotifMessage(getUsernameFromSession(session) + " is in check.");
@@ -230,14 +239,12 @@ public class WSHandler {
                 }
             }
 
-            gameobj.setTeamTurn((gameobj.getTeamTurn() == ChessGame.TeamColor.WHITE) ? ChessGame.TeamColor.BLACK : ChessGame.TeamColor.WHITE);
-
             game.setGame(gameobj);
-            String gamestr = new Gson().toJson(game);
+            String gamestr = new Gson().toJson(gameobj);
             (new GameDAO()).updateGame(conn, command.getGameID(),gamestr);
 
             LoadMessage load = new LoadMessage(gamestr);
-            broadcastMessage(command.getGameID(), new Gson().toJson(load), getUsernameFromSession(session));
+            broadcastMessage(command.getGameID(), new Gson().toJson(load), null);
 
             NotifMessage notif = new NotifMessage("Player made move " + command.getMove().toString() + ".");
             broadcastMessage(command.getGameID(), new Gson().toJson(notif), getUsernameFromSession(session));
@@ -260,8 +267,40 @@ public class WSHandler {
             conn = db.getConnection();
             // get user's color in their game
             Game game = (new GameDAO()).findGame(conn, command.getGameID());
-            String color = (game.getWhiteUsername().equals(getUsernameFromSession(session))) ? "WHITE" : "BLACK";
-            (new GameDAO()).claimSpot(conn, command.getGameID(),null,color);
+            // check if fields are null first
+            String color = null;
+            if (game.getWhiteUsername() != null) {
+                if (game.getWhiteUsername().equals(getUsernameFromSession(session))) {
+                    color = "WHITE";
+                }
+            }
+            if (game.getBlackUsername() != null) {
+                if (game.getBlackUsername().equals(getUsernameFromSession(session))) {
+                    color = "BLACK";
+                }
+            }
+            // check if observer
+            if (color == null) {
+//                LinkedList<String> observers = (new GameDAO()).findObservers(conn, command.getGameID());
+//                System.out.println(observers);
+//                if (observers.contains(getUsernameFromSession(session))) {
+//                    (new GameDAO()).removeObserver(conn, command.getGameID(), getUsernameFromSession(session));
+                // get list of sessions in game
+                Map<String,Session> sessions = getSessionsFromGame(command.getGameID());
+                if (sessions.containsKey(getUsernameFromSession(session))) {
+
+                    NotifMessage notif = new NotifMessage(getUsernameFromSession(session) + " left game.");
+                    broadcastMessage(command.getGameID(), new Gson().toJson(notif), getUsernameFromSession(session));
+
+                    removeUserFromGame(command.getGameID(), getUsernameFromSession(session));
+                    return;
+                }
+                ErrorMessage error = new ErrorMessage("Error: not a player in game");
+                sendMessage(command.getGameID(), new Gson().toJson(error), getUsernameFromSession(session));
+                return;
+            }
+
+            (new GameDAO()).removeSpot(conn, command.getGameID(),color);
 
             NotifMessage notif = new NotifMessage(getUsernameFromSession(session) + " left game.");
             broadcastMessage(command.getGameID(), new Gson().toJson(notif), getUsernameFromSession(session));
@@ -276,28 +315,36 @@ public class WSHandler {
     }
 
     private void resign(Session session, IdCommand command) {
-        // check if game exists
-        // check if user is in game
-        // resign user
-        // send message
-        // broadcast message
+
         Connection conn = null;
         try {
             conn = db.getConnection();
             Game game = (new GameDAO()).findGame(conn, command.getGameID());
-            String color = (game.getWhiteUsername().equals(getUsernameFromSession(session))) ? "WHITE" : "BLACK";
+            String username = getUsernameFromSession(session);
 
-            // remove both users from game
-            (new GameDAO()).claimSpot(conn, command.getGameID(),null,"WHITE");
-            (new GameDAO()).claimSpot(conn, command.getGameID(),null,"BLACK");
+            // check user is a player in game
+            if (!game.getWhiteUsername().equals(username) && !game.getBlackUsername().equals(username)) {
+                ErrorMessage error = new ErrorMessage("Error: not a player in game");
+                sendMessage(command.getGameID(), new Gson().toJson(error), username);
+                return;
+            }
+            // check game is not already over
+            if (game.getGame().getTeamTurn() == ChessGame.TeamColor.NONE) {
+                ErrorMessage error = new ErrorMessage("Error: game is already over");
+                sendMessage(command.getGameID(), new Gson().toJson(error), username);
+                return;
+            }
 
-            // add players as observers
-            (new GameDAO()).observeGame(conn, command.getGameID(), game.getWhiteUsername());
-            (new GameDAO()).observeGame(conn, command.getGameID(), game.getBlackUsername());
+            // update game as over
+            ChessGame gameobj = game.getGame();
+            gameobj.setTeamTurn(ChessGame.TeamColor.NONE);
+            game.setGame(gameobj);
+            String gamestr = new Gson().toJson(gameobj);
+            (new GameDAO()).updateGame(conn, command.getGameID(),gamestr);
 
             // send message
-            NotifMessage notif = new NotifMessage(getUsernameFromSession(session)+" resigned.");
-            broadcastMessage(command.getGameID(), new Gson().toJson(notif), getUsernameFromSession(session));
+            NotifMessage notif = new NotifMessage(username+" resigned.");
+            broadcastMessage(command.getGameID(), new Gson().toJson(notif), null);
 
         } catch (DataAccessException e) {
             ErrorMessage error = new ErrorMessage(e.getMessage());
@@ -331,7 +378,6 @@ public class WSHandler {
         for (Map.Entry<String,Session> sesh : getSessionsFromGame(gameID).entrySet()) {
             if (!sesh.getKey().equals(userExcluded)) {
                 try {
-                    System.out.println("Sending to: " + sesh.getKey());
                     sesh.getValue().getRemote().sendString(message);
                 } catch (Exception e) {
                     System.out.println("Error in broadcast: " + e.toString());
@@ -343,7 +389,6 @@ public class WSHandler {
     private void sendMessage(int gameID, String message, String username) {
         System.out.println("Sending: " + message);
         try {
-            System.out.println(sessionMap);
             getSessionsFromGame(gameID).get(username).getRemote().sendString(message);
         } catch (Exception e) {
             System.out.println("Error in sending: " + e.toString());
@@ -353,7 +398,6 @@ public class WSHandler {
     private void sendSessMessage(Session session, String message) {
         System.out.println("Sending: " + message);
         try {
-            System.out.println(sessionMap);
             session.getRemote().sendString(message);
         } catch (Exception e) {
             System.out.println("Error in sending sess message: " + e.toString());

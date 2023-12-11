@@ -17,9 +17,9 @@ import serverMessages.*;
 public class Client {
     public static boolean loggedIn = false;
     public static boolean inGame = false;
-    private static boolean whiteOrient = true;
+    private static boolean whiteOrient = false;
     public static GameImpl game;
-    public static int gameID; //TODO: assign
+    public static int gameID;
     public static WSClient wsClient;
 
     public static void main(String[] args) throws Exception {
@@ -64,6 +64,7 @@ public class Client {
 
     private static class ActualGameHandler implements GameHandler {
         public void updateGame(String message) {
+            System.out.println("Game updated.");
             LoadMessage loadMessage = new Gson().fromJson(message, LoadMessage.class);
             String gamestr = loadMessage.getGame();
 
@@ -72,7 +73,9 @@ public class Client {
             builder.registerTypeAdapter(ChessPiece.class, new PieceAdapter());
 
             game = builder.create().fromJson(gamestr, GameImpl.class);
+            System.out.println();
             displayBoard(game.getBoard());
+            System.out.printf("%s >>> ", loggedIn ? "WELCOME" : "LOGIN");
         }
 
         public void printMessage(String message) {
@@ -123,7 +126,9 @@ public class Client {
                 try {
                     // get legal move
                     String pos = inputArr[1];
-                    Collection<ChessMove> moves = game.validMoves(convertPos(pos));
+                    ChessPosition position = convertPos(pos);
+                    position = new PositionImpl(position.getRow(), position.getColumn()); // add 9- to row
+                    Collection<ChessMove> moves = game.validMoves(position);
                     highlightBoard(moves);
                 } catch (Exception e) {
                     System.out.println(e.getMessage());
@@ -308,13 +313,21 @@ public class Client {
             }
             boardArr[i-1] = row;
         }
-        for (ChessMove move : moves) {
-            ChessPosition end = move.getEndPosition();
-            int row = end.getRow();
-            int col = end.getColumn();
+        // highlight original position
+        if (!moves.isEmpty()) {
+            ChessPosition start = moves.iterator().next().getStartPosition();
+            int row = start.getRow()-1;
+            int col = start.getColumn()-1;
             boardArr[row][col] = "X"+boardArr[row][col];
         }
-        printBoard(boardArr, whiteOrient);
+        for (ChessMove move : moves) {
+            ChessPosition end = move.getEndPosition();
+            // reverse row and col to other side
+            int row = end.getRow()-1;
+            int col = end.getColumn()-1;
+            boardArr[row][col] = "X"+boardArr[row][col];
+        }
+        printBoard(boardArr, !whiteOrient);
         System.out.println();
     }
 
@@ -326,8 +339,9 @@ public class Client {
                 String piece = row[i];
                 if (piece.startsWith("X")) {
                     piece = piece.substring(1);
+                    rowString += black ? SET_BG_COLOR_GREEN : SET_BG_COLOR_DARK_GREEN;
                     rowString += (piece.equals(" ") ? "   " :  piece );
-                    rowString += black ? SET_BG_COLOR_DARK_GREEN : SET_BG_COLOR_GREEN;
+                    rowString += black ? SET_BG_COLOR_DARK_GREY : SET_BG_COLOR_LIGHT_GREY;
                     black = !black;
 
                 } else {
@@ -342,8 +356,9 @@ public class Client {
                 // check if it begins with an X for highlighting, if so take it off
                 if (piece.startsWith("X")) {
                     piece = piece.substring(1);
+                    rowString += black ? SET_BG_COLOR_GREEN : SET_BG_COLOR_DARK_GREEN;
                     rowString += (piece.equals(" ") ? "   " :  piece );
-                    rowString += black ? SET_BG_COLOR_DARK_GREEN : SET_BG_COLOR_GREEN;
+                    rowString += black ? SET_BG_COLOR_DARK_GREY : SET_BG_COLOR_LIGHT_GREY;
                     black = !black;
 
                 } else {
@@ -360,16 +375,16 @@ public class Client {
     private static void printBoard(String[][] board,boolean reverse) {
         String labels = "    a  b  c  d  e  f  g  h    ";
         String revlabels = "    h  g  f  e  d  c  b  a    ";
-        if (reverse) {
+        if (reverse) { // switched these blocks of code (the for loops) and switched reverse bools
             System.out.println(SET_BG_COLOR_DARK_GREEN+SET_TEXT_COLOR_WHITE+ revlabels+RESET_BG_COLOR);
-            for (int i = 7; i>=0; i--) {
-                System.out.println(rowtoString(board[i], i+1, i%2==0,true));
+            for (int i = 0; i<8; i++) {
+                System.out.println(rowtoString(board[i], i+1, (8-i)%2==1,true));
             }
             System.out.println(SET_BG_COLOR_DARK_GREEN+SET_TEXT_COLOR_WHITE+ revlabels+RESET_BG_COLOR);
         } else {
             System.out.println(SET_BG_COLOR_DARK_GREEN+SET_TEXT_COLOR_WHITE+ labels+RESET_BG_COLOR);
-            for (int i = 0; i<8; i++) {
-                System.out.println(rowtoString(board[i], 8-i, (8-i)%2==1,false));
+            for (int i = 7; i>=0; i--) {
+                System.out.println(rowtoString(board[i], i+1, i%2==0,false));
             }
             System.out.println(SET_BG_COLOR_DARK_GREEN+SET_TEXT_COLOR_WHITE+ labels+RESET_BG_COLOR);
         }
@@ -390,16 +405,15 @@ public class Client {
             }
             boardArr[i-1] = row;
         }
-        printBoard(boardArr, whiteOrient);
+        printBoard(boardArr, !whiteOrient);
         System.out.println(RESET_BG_COLOR);
         return "";
     }
 
     private static ChessPosition convertPos(String pos) {
-        int row = 8 - (pos.charAt(1) - '0');
-        int col = pos.charAt(0) - 'a';
+        int row = (pos.charAt(1) - '0');
+        int col = (pos.charAt(0) - 'a')+1;
         return new PositionImpl(row, col);
-        //TODO: test this
     }
 
     private static String getPieceString(ChessPiece.PieceType pieceType, ChessGame.TeamColor teamColor) {

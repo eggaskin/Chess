@@ -25,7 +25,8 @@ public interface ChessGame {
      */
     enum TeamColor {
         WHITE,
-        BLACK
+        BLACK,
+        NONE
     }
 
     /**

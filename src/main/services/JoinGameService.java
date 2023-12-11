@@ -29,6 +29,8 @@ public class JoinGameService {
         }
 
         try {
+            System.out.println("join game service triggered");
+
             conn = db.getConnection();
             // get user's username
             AuthToken token = (new AuthDAO()).getAuthToken(conn,tok);
@@ -39,6 +41,8 @@ public class JoinGameService {
             }
             else {
                 // otherwise, observe game
+                System.out.println("trying to add an observer");
+
                 (new GameDAO()).observeGame(conn,request.getGameID(), token.getUsername());
             }
         } catch (DataAccessException e) {

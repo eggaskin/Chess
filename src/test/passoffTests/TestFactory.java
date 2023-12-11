@@ -62,7 +62,7 @@ public class TestFactory {
         just know increasing it can make tests take longer to run.
         (On the flip side, if you've got a good computer feel free to decrease it)
          */
-        return 3000L;
+        return 2000L;
     }
     //------------------------------------------------------------------------------------------------------------------
 }

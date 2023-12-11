@@ -17,9 +17,8 @@ import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.util.HashMap;
-import static comms.Client.wsClient;
-import static comms.Client.loggedIn;
-import static comms.Client.inGame;
+
+import static comms.Client.*;
 
 public class ServerFacade {
     private static final String serverUrl = "http://localhost:8080";
@@ -145,6 +144,7 @@ public class ServerFacade {
         // Make the request
         http.connect();
         Object responseBody = getResponse(http, JoinGameResponse.class);
+        gameID = id;
 
         wsClient.connect();
         if (color == null) {

@@ -26,7 +26,7 @@ public class WSClient extends Endpoint {
         this.session.addMessageHandler(new MessageHandler.Whole<String>() {
             @Override
             public void onMessage(String message) {
-                System.out.println("Received message: " + message);
+                //System.out.println("Received message: " + message);
                 // deserialize message to ServerMessage
                 // pass to gameHandler
                 var body = new Gson().fromJson(message, ServerMessage.class);
@@ -84,7 +84,7 @@ public class WSClient extends Endpoint {
     }
 
     public void send(String msg) throws Exception {
-        System.out.println("Sending message: " + msg);
+        //System.out.println("Sending message: " + msg);
         this.session.getAsyncRemote().sendText(msg);
     }
 
